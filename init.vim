@@ -1,13 +1,19 @@
 syntax on
 
-set noerrorbells
-set tabstop=2
-set softtabstop=2
-set shiftwidth=2
-" set expandtab
-" set smartindent
+let mapleader = " "
+
+let tabsize = 4
+execute "set tabstop=".tabsize
+execute "set softtabstop=".tabsize
+execute "set shiftwidth=".tabsize
+
+set expandtab
+set smarttab
+set smartindent
 set autoindent
+
 set nu
+set noerrorbells
 set nowrap
 set smartcase
 set noswapfile
@@ -35,13 +41,18 @@ ab vimrcpath C:\Users\Alex\AppData\Local\nvim\init.vim
 tnoremap <Esc> <C-\><C-n>
 nnoremap gb :buffers<CR>:buffer<Space>
 nnoremap gB :buffers<CR>:
-nnoremap <C-t> :tabnew<Space>
-inoremap <C-t> <Esc>:tabnew<Space>
-nnoremap <F8> :setl noai nocin nosi inde=<CR>
+nnoremap <F8> :setl noai nocin nosi noh inde=<CR>
 
 " -----------------------------------------------------------------------------------------------------------------------------------------
 " leader config
-nnoremap <leader>p "0p<CR>
+
+nnoremap <leader>gt :LsByTab<CR>
+nnoremap <leader>td :tabc<CR>
+nnoremap <silent> <Leader>bd :Bclose<CR>
+
+" db
+nnoremap <leader>r :%DB mysql://root@localhost<CR>
+
 " -----------------------------------------------------------------------------------------------------------------------------------------
 " plugin config
 
@@ -57,8 +68,15 @@ Plug 'mhinz/vim-startify'
 Plug 'tpope/vim-obsession'
 Plug 'tpope/vim-repeat'
 Plug 'tpope/vim-surround'
-Plug 'neoclide/coc.nvim', {'branch':'release'}
+Plug 'tpope/vim-fugitive'
+Plug 'tpope/vim-dadbod'
+Plug 'rbong/vim-flog'
+Plug 'lervag/vimtex'
+" Plug 'neoclide/coc.nvim', {'branch':'release'}
 Plug 'preservim/nerdtree'
+
+Plug 'rbgrouleff/bclose.vim'
+Plug 'Yggdroot/indentLine'
 call plug#end()
 
 let g:gruvbox_contrast_dark = 'medium'
@@ -78,53 +96,13 @@ augroup twig_ft
   au!
   autocmd BufNewFile,BufRead *.razor   set syntax=cshtml
 augroup END
-" -----------------------------------------------------------------------------------------------------------------------------------------
-" coc config
 
-" Use tab for trigger completion with characters ahead and navigate.
-" Use command ':verbose imap <tab>' to make sure tab is not mapped by other plugin.
-inoremap <silent><expr> <TAB>
-      \ pumvisible() ? "\<C-n>" :
-      \ <SID>check_back_space() ? "\<TAB>" :
-      \ coc#refresh()
-inoremap <expr><S-TAB> pumvisible() ? "\<C-p>" : "\<C-h>"
-
-function! s:check_back_space() abort
-    let col = col('.') - 1
-    return !col || getline('.')[col - 1]  =~# '\s'
-endfunction
-
-" Use <c-space> to trigger completion.
-inoremap <silent><expr> <c-space> coc#refresh()
-
-" Use <cr> to confirm completion, `<C-g>u` means break undo chain at current position.
-" Coc only does snippet and additional edit on confirm.
-inoremap <expr> <cr> pumvisible() ? "\<C-y>" : "\<C-g>u\<CR>"
-
-
-" Use `[c` and `]c` to navigate diagnostics
-nmap <silent> [c <Plug>(coc-diagnostic-prev)
-nmap <silent> ]c <Plug>(coc-diagnostic-next)
-
-" Remap keys for gotos
-nmap <silent> gd <Plug>(coc-definition)
-nmap <silent> gy <Plug>(coc-type-definition)
-nmap <silent> gi <Plug>(coc-implementation)
-nmap <silent> gr <Plug>(coc-references)
-
-" Use K to show documentation in preview window
-nnoremap <silent> K :call <SID>show_documentation()<CR>
-
-function! s:show_documentation()
-  if (index(['vim','help'], &filetype) >= 0)
-    execute 'h '.expand('<cword>')
-  else
-    call CocAction('doHover')
-  endif
-endfunction
-
-" Add status line support, for integration with other plugin, checkout `:h coc-status`
-set statusline^=%{coc#status()}%{get(b:,'coc_current_function','')}
+" remember and reload folds when I leave or enter a buffer
+augroup remember_folds
+  autocmd!
+  autocmd BufWinLeave * mkview
+  autocmd BufWinEnter * silent! loadview
+augroup END
 
 
 " -----------------------------------------------------------------------------------------------------------------------------------------
@@ -139,6 +117,50 @@ let g:vimroom_background=9
 " fix end of page color and autocomplete menu
 hi! EndOfBuffer ctermbg=bg ctermfg=bg guibg=bg guifg=bg
 highlight Pmenu ctermbg=bg ctermfg=bg
+
+
+" ----------------------------------------------------------------------------- 
+" get buffers in current tab
+
+
+"
+" Get the output of :ls as a List of lines.
+"
+function! s:LsOutput(bang, args)
+    redir => ls_output
+    exe 'silent ls' . a:bang a:args
+    redir END
+    return split(ls_output, "\n")
+endfunction
+
+"
+" Group the output of :ls by tabs and print it.
+"
+function! LsByTab(bang, args)
+    let ls_output = s:LsOutput(a:bang, a:args)
+
+    " Iterate over all tabs.
+    for tab in gettabinfo()
+        echo '===== tab' tab.tabnr '====='
+        " Get the buffer numbers for the current tab.
+        let buffers = tabpagebuflist(tab.tabnr)
+        " Construct a regular expression that matches the buffer numbers
+        " at the start of the lines of the :ls output.
+        let buffers_pat = '^\s*\(' . join(buffers, '\|') . '\)\>'
+        " Filter the lines from the :ls output so that only the lines for
+        " the buffers of the current tab remain.
+        let tab_buffers = filter(copy(ls_output), 'v:val =~ buffers_pat')
+        " Print the info for the current tab.
+        echo join(tab_buffers, "\n")
+    endfor
+endfunction
+
+command! -bang -nargs=? LsByTab call LsByTab(<q-bang>, <q-args>)
+
+
+
+" ---------------------------------------------------------------------------------
+" remove mappings
 
 
 " Remove newbie crutches in Command Mode
@@ -184,3 +206,28 @@ vnoremap <S-Down> <Nop>
 vnoremap <S-Left> <Nop>
 vnoremap <S-Right> <Nop>
 vnoremap <S-Up> <Nop>
+
+" ---------------------------------------------------------
+" Disable ctrl-z
+
+cnoremap <C-z> <Nop>
+inoremap <C-z> <Nop>
+nnoremap <C-z> <Nop>
+vnoremap <C-z> <Nop>
+
+" ---------------------------------------------------------
+" Show leading whitespace
+
+set list
+set listchars=tab:>-
+
+" ---------------------------------------------------------
+" Fix ShaDA
+" see https://vi.stackexchange.com/a/10029
+if !has('nvim')
+  set viminfo+=n~/vim/viminfo
+else
+  " Do nothing here to use the neovim default
+  " or do soemething like:
+  " set viminfo+=n~/.shada
+endif
